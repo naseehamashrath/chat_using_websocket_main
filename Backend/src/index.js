@@ -3,10 +3,10 @@ import { WebSocketServer, WebSocket } from "ws";
 const wss = new WebSocketServer({ port: 8080 });
 console.log("✅ WebSocket server running on ws://localhost:8080");
 
-const rooms: Map<string, Set<WebSocket>> = new Map();
-const socketToRoom: Map<WebSocket, string> = new Map();
+const rooms = new Map();
+const socketToRoom = new Map();
 
-function safeJsonParse(data: WebSocket.RawData): any | null {
+function safeJsonParse(data) {
   try {
     return JSON.parse(data.toString());
   } catch {
@@ -14,7 +14,7 @@ function safeJsonParse(data: WebSocket.RawData): any | null {
   }
 }
 
-function broadcastToRoom(roomId: string, data: any, exclude?: WebSocket) {
+function broadcastToRoom(roomId, data, exclude) {
   const room = rooms.get(roomId);
   if (!room) return;
   const message = JSON.stringify(data);
@@ -35,22 +35,26 @@ wss.on("connection", (socket) => {
     const { type, payload } = data;
 
     if (type === "join") {
-      const roomId = payload?.room;
+      const roomId = payload && payload.room;
       if (!roomId) return;
 
       if (!rooms.has(roomId)) rooms.set(roomId, new Set());
-      rooms.get(roomId)!.add(socket);
+      rooms.get(roomId).add(socket);
       socketToRoom.set(socket, roomId);
 
-      broadcastToRoom(roomId, {
-        type: "system",
-        payload: { message: "A new user joined the room." },
-      }, socket);
+      broadcastToRoom(
+        roomId,
+        {
+          type: "system",
+          payload: { message: "A new user joined the room." },
+        },
+        socket
+      );
     }
 
     if (type === "chat") {
       const roomId = socketToRoom.get(socket);
-      if (!roomId || !payload?.message) return;
+      if (!roomId || !payload || !payload.message) return;
       broadcastToRoom(roomId, {
         type: "chat",
         payload: { message: payload.message },
@@ -60,16 +64,21 @@ wss.on("connection", (socket) => {
     if (type === "typing") {
       const roomId = socketToRoom.get(socket);
       if (!roomId) return;
-      broadcastToRoom(roomId, {
-        type: "typing",
-        payload: {},
-      }, socket);
+      broadcastToRoom(
+        roomId,
+        {
+          type: "typing",
+          payload: {},
+        },
+        socket
+      );
     }
 
     if (type === "leave") {
       const roomId = socketToRoom.get(socket);
       if (!roomId) return;
-      rooms.get(roomId)?.delete(socket);
+      const room = rooms.get(roomId);
+      if (room) room.delete(socket);
       socketToRoom.delete(socket);
       broadcastToRoom(roomId, {
         type: "system",
@@ -81,7 +90,8 @@ wss.on("connection", (socket) => {
   socket.on("close", () => {
     const roomId = socketToRoom.get(socket);
     if (!roomId) return;
-    rooms.get(roomId)?.delete(socket);
+    const room = rooms.get(roomId);
+    if (room) room.delete(socket);
     socketToRoom.delete(socket);
     broadcastToRoom(roomId, {
       type: "system",
