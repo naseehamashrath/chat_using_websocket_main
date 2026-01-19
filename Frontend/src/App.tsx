@@ -13,7 +13,7 @@ function App() {
   useEffect(() => {
     if (!joined) return;
 
-    const ws = new WebSocket("ws://localhost:8080");
+    const ws = new WebSocket("wss://chat-using-websocket-main.onrender.com");
 
     ws.onopen = () => {
       ws.send(JSON.stringify({
